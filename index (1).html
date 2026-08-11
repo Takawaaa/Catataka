@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catataka — a small daily diary</title>
+<meta name="description" content="A private, single-page diary with calendar and page views, plus an emoji mood trail.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✒️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --navy-deep:#12151f;
+    --navy:#1b2130;
+    --navy-raised:#232c3f;
+    --paper:#f4eedf;
+    --paper-dim:#e8dfc8;
+    --amber:#e3a857;
+    --amber-soft:#f2c98a;
+    --rose:#d9727a;
+    --ink:#2a2a28;
+    --ink-faint:#9aa3bd;
+    --line: rgba(244,238,223,0.14);
+    --radius-lg:20px;
+    --radius-md:12px;
+    --font-display:'Fraunces', Georgia, serif;
+    --font-ui:'Space Grotesk', system-ui, sans-serif;
+  }
+
+  *,*::before,*::after{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 50% -10%, #263252 0%, var(--navy) 45%, var(--navy-deep) 100%);
+    color:var(--paper);
+    font-family:var(--font-ui);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .app{
+    max-width:760px;
+    margin:0 auto;
+    padding:2.5rem 1.5rem 4rem;
+  }
+
+  /* ---------- Header ---------- */
+  .app-header{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:1rem;
+    flex-wrap:wrap;
+    margin-bottom:1.75rem;
+  }
+  .brand{ display:flex; align-items:center; gap:.7rem; }
+  .brand-mark{ font-size:1.9rem; line-height:1; filter:saturate(0.9); }
+  .brand h1{
+    font-family:var(--font-display);
+    font-optical-sizing:auto;
+    font-weight:600;
+    font-size:1.9rem;
+    margin:0;
+    letter-spacing:.01em;
+  }
+  .brand .tagline{
+    margin:.1rem 0 0;
+    font-size:.8rem;
+    letter-spacing:.06em;
+    text-transform:lowercase;
+    color:var(--ink-faint);
+  }
+
+  .view-toggle{
+    display:flex;
+    background:rgba(255,255,255,0.05);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:4px;
+    gap:2px;
+  }
+  .toggle-btn{
+    font-family:var(--font-ui);
+    font-size:.85rem;
+    font-weight:500;
+    border:none;
+    background:transparent;
+    color:var(--ink-faint);
+    padding:.5rem 1rem;
+    border-radius:999px;
+    cursor:pointer;
+    transition:background .18s ease, color .18s ease;
+  }
+  .toggle-btn:hover{ color:var(--paper); }
+  .toggle-btn.active{
+    background:var(--amber);
+    color:#3a2508;
+  }
+
+  /* ---------- Mood trail (signature element) ---------- */
+  .mood-trail{
+    position:relative;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    overflow-x:auto;
+    padding:1rem .5rem 1.2rem;
+    margin-bottom:2rem;
+    scrollbar-width:thin;
+  }
+  .mood-trail::before{
+    content:"";
+    position:absolute;
+    left:1rem; right:1rem; top:calc(1rem + 15px);
+    height:1px;
+    background:linear-gradient(90deg, transparent, var(--amber-soft) 12%, var(--amber-soft) 88%, transparent);
+    opacity:.45;
+    z-index:0;
+  }
+  .mood-trail .bead{
+    position:relative;
+    z-index:1;
+    flex:0 0 auto;
+    width:32px; height:32px;
+    border-radius:50%;
+    background:var(--navy-raised);
+    border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.05rem;
+    cursor:pointer;
+    transition:transform .15s ease, border-color .15s ease;
+  }
+  .mood-trail .bead:hover{ transform:translateY(-3px) scale(1.08); border-color:var(--amber); }
+  .mood-trail .trail-empty{
+    font-size:.85rem;
+    color:var(--ink-faint);
+    font-style:italic;
+    padding:0 .25rem;
+  }
+
+  /* ---------- Views ---------- */
+  .view{ display:none; }
+  .view.active{ display:block; animation:fadeIn .35s ease; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+
+  /* ---------- Calendar ---------- */
+  .calendar-nav{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:1.2rem;
+    margin-bottom:1.1rem;
+  }
+  .calendar-nav h2{
+    font-family:var(--font-display);
+    font-weight:500;
+    font-size:1.3rem;
+    margin:0;
+    min-width:180px;
+    text-align:center;
+  }
+  .nav-btn{
+    width:34px; height:34px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:rgba(255,255,255,0.04);
+    color:var(--paper);
+    font-size:1.1rem;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .15s ease, border-color .15s ease;
+  }
+  .nav-btn:hover{ background:rgba(255,255,255,0.09); border-color:var(--amber); }
+
+  .weekday-row{
+    display:grid;
+    grid-template-columns:repeat(7,1fr);
+    gap:8px;
+    margin-bottom:6px;
+  }
+  .weekday-row span{
+    text-align:center;
+    font-size:.7rem;
+    letter-spacing:.08em;
+    color:var(--ink-faint);
+    text-transform:uppercase;
+  }
+
+  .calendar-grid{
+    display:grid;
+    grid-template-columns:repeat(7,1fr);
+    gap:8px;
+  }
+  .day-cell{
+    aspect-ratio:1/1;
+    border-radius:var(--radius-md);
+    border:1px solid var(--line);
+    background:rgba(255,255,255,0.03);
+    color:var(--paper);
+    font-family:var(--font-ui);
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    padding:4px;
+    transition:transform .12s ease, background .15s ease, border-color .15s ease;
+  }
+  .day-cell:hover{ transform:translateY(-2px); border-color:var(--amber-soft); }
+  .day-cell.blank{ visibility:hidden; cursor:default; }
+  .day-cell .day-num{ font-size:.8rem; color:var(--ink-faint); }
+  .day-cell .day-mood{ font-size:1.15rem; line-height:1; }
+  .day-cell.has-entry{
+    background:var(--paper);
+    border-color:var(--paper);
+  }
+  .day-cell.has-entry .day-num{ color:#6b5a33; }
+  .day-cell.is-today{ box-shadow:0 0 0 2px var(--amber) inset; }
+
+  /* ---------- Blog / pages view ---------- */
+  .search-wrap{ position:relative; margin-bottom:1.1rem; }
+  .search-wrap input[type="search"]{
+    width:100%;
+    font-family:var(--font-ui);
+    font-size:.9rem;
+    color:var(--paper);
+    background:rgba(255,255,255,0.05);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:.65rem 1.1rem;
+  }
+  .search-wrap input[type="search"]::placeholder{ color:var(--ink-faint); }
+  .search-wrap input[type="search"]:focus{
+    outline:2px solid var(--amber);
+    outline-offset:2px;
+  }
+  .blog-list{ display:flex; flex-direction:column; gap:1.1rem; }
+  .page-card{
+    background:var(--paper);
+    color:var(--ink);
+    border-radius:var(--radius-lg);
+    padding:1.3rem 1.4rem;
+    box-shadow:0 10px 24px rgba(0,0,0,0.28);
+    cursor:pointer;
+    transition:transform .15s ease;
+  }
+  .page-card:nth-child(odd){ transform:rotate(-0.35deg); }
+  .page-card:nth-child(even){ transform:rotate(0.35deg); }
+  .page-card:hover{ transform:translateY(-3px); }
+  .page-card-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:.6rem;
+    margin-bottom:.5rem;
+  }
+  .page-date{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:1.05rem;
+  }
+  .page-mood{ font-size:1.4rem; }
+  .page-text{
+    font-family:var(--font-display);
+    font-size:1rem;
+    line-height:1.55;
+    white-space:pre-wrap;
+    color:#413b2e;
+    margin:0;
+    max-height:6.4em;
+    overflow:hidden;
+  }
+  .empty-state{
+    text-align:center;
+    color:var(--ink-faint);
+    font-style:italic;
+    padding:2.5rem 1rem;
+    border:1px dashed var(--line);
+    border-radius:var(--radius-md);
+  }
+
+  /* ---------- Footer ---------- */
+  .app-footer{
+    margin-top:2.5rem;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:.9rem;
+    flex-wrap:wrap;
+    font-size:.8rem;
+  }
+  .ghost-btn{
+    font-family:var(--font-ui);
+    font-size:.8rem;
+    color:var(--ink-faint);
+    background:transparent;
+    border:1px solid var(--line);
+    padding:.45rem .9rem;
+    border-radius:999px;
+    cursor:pointer;
+    transition:color .15s ease, border-color .15s ease;
+  }
+  .ghost-btn:hover{ color:var(--paper); border-color:var(--amber-soft); }
+  .ghost-btn.connected{ color:var(--amber); border-color:var(--amber); }
+  .ghost-btn:disabled{ opacity:.55; cursor:default; }
+  .file-btn{ display:inline-flex; align-items:center; }
+  .storage-note{ color:var(--ink-faint); }
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{
+    position:fixed; inset:0;
+    background:rgba(10,12,20,0.6);
+    backdrop-filter:blur(3px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:1.2rem;
+    z-index:50;
+  }
+  .modal-backdrop[hidden]{ display:none; }
+  .modal{
+    width:100%;
+    max-width:480px;
+    background:var(--paper);
+    color:var(--ink);
+    border-radius:var(--radius-lg);
+    padding:1.5rem;
+    box-shadow:0 24px 60px rgba(0,0,0,0.45);
+    max-height:88vh;
+    overflow-y:auto;
+  }
+  .modal-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:1rem;
+  }
+  .modal-head h3{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:1.2rem;
+    margin:0;
+  }
+  .icon-btn{
+    width:30px; height:30px;
+    border-radius:50%;
+    border:none;
+    background:rgba(0,0,0,0.06);
+    cursor:pointer;
+    font-size:.95rem;
+    color:var(--ink);
+  }
+  .icon-btn:hover{ background:rgba(0,0,0,0.12); }
+
+  .mood-picker{
+    display:flex;
+    flex-wrap:wrap;
+    gap:.5rem;
+    margin-bottom:1rem;
+  }
+  .mood-option{
+    border:1px solid rgba(0,0,0,0.12);
+    background:rgba(255,255,255,0.5);
+    border-radius:999px;
+    padding:.4rem .7rem;
+    font-size:1.05rem;
+    cursor:pointer;
+    display:flex; align-items:center; gap:.35rem;
+    transition:background .15s ease, border-color .15s ease;
+  }
+  .mood-option span.label{
+    font-family:var(--font-ui);
+    font-size:.72rem;
+    color:#6b6552;
+  }
+  .mood-option.selected{
+    background:var(--amber-soft);
+    border-color:var(--amber);
+  }
+
+  #entryText{
+    width:100%;
+    font-family:var(--font-display);
+    font-size:1rem;
+    line-height:1.5;
+    padding:.8rem;
+    border-radius:var(--radius-md);
+    border:1px solid rgba(0,0,0,0.12);
+    resize:vertical;
+    background:rgba(255,255,255,0.55);
+    color:var(--ink);
+  }
+  #entryText:focus, .toggle-btn:focus-visible, .nav-btn:focus-visible, .day-cell:focus-visible, .ghost-btn:focus-visible, .icon-btn:focus-visible, .mood-option:focus-visible, .primary-btn:focus-visible, .danger-btn:focus-visible{
+    outline:2px solid var(--amber);
+    outline-offset:2px;
+  }
+
+  .modal-actions{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:1.1rem;
+    gap:.6rem;
+  }
+  .primary-btn, .danger-btn{
+    font-family:var(--font-ui);
+    font-weight:500;
+    font-size:.85rem;
+    border:none;
+    border-radius:999px;
+    padding:.6rem 1.2rem;
+    cursor:pointer;
+  }
+  .primary-btn{ background:var(--amber); color:#3a2508; margin-left:auto; }
+  .primary-btn:hover{ background:var(--amber-soft); }
+  .danger-btn{ background:transparent; color:var(--rose); border:1px solid var(--rose); }
+  .danger-btn:hover{ background:rgba(217,114,122,0.1); }
+
+  @media (max-width:520px){
+    .app-header{ flex-direction:column; align-items:flex-start; }
+    .day-cell .day-mood{ font-size:.95rem; }
+    .calendar-nav h2{ font-size:1.05rem; min-width:auto; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">✒️</span>
+        <div>
+          <h1>Catataka</h1>
+          <p class="tagline">a small thought, kept</p>
+        </div>
+      </div>
+      <nav class="view-toggle" aria-label="Switch view">
+        <button class="toggle-btn active" data-view="calendar">Calendar</button>
+        <button class="toggle-btn" data-view="blog">Pages</button>
+      </nav>
+    </header>
+
+    <section class="mood-trail" id="moodTrail" aria-label="Recent moods"></section>
+
+    <main>
+      <section id="calendarView" class="view active">
+        <div class="calendar-nav">
+          <button class="nav-btn" id="prevMonth" aria-label="Previous month">‹</button>
+          <h2 id="monthLabel"></h2>
+          <button class="nav-btn" id="nextMonth" aria-label="Next month">›</button>
+        </div>
+        <div class="weekday-row">
+          <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </section>
+
+      <section id="blogView" class="view">
+        <div class="search-wrap">
+          <input type="search" id="searchInput" placeholder="Search your pages..." aria-label="Search your pages">
+        </div>
+        <div class="blog-list" id="blogList"></div>
+        <p class="empty-state" id="blogEmpty" hidden></p>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <button class="ghost-btn" id="driveSyncBtn" type="button">Connect Google Drive</button>
+      <button class="ghost-btn" id="exportBtn" type="button">Export backup</button>
+      <label class="ghost-btn file-btn">
+        Import backup
+        <input type="file" id="importInput" accept="application/json" hidden>
+      </label>
+      <span class="storage-note" id="storageNote">Saved privately in this browser only.</span>
+    </footer>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalDate">
+      <div class="modal-head">
+        <h3 id="modalDate"></h3>
+        <button class="icon-btn" id="closeModal" aria-label="Close">✕</button>
+      </div>
+      <div class="mood-picker" id="moodPicker"></div>
+      <textarea id="entryText" rows="7" placeholder="What happened today..."></textarea>
+      <div class="modal-actions">
+        <button class="danger-btn" id="deleteEntry" type="button" hidden>Delete page</button>
+        <button class="primary-btn" id="saveEntry" type="button">Save page</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "catataka_entries_v1";
+
+  /* ---- Google Drive sync setup ----
+     1. In Google Cloud Console, create a project (or use an existing one).
+     2. Enable the "Google Drive API" under APIs & Services > Library.
+     3. Go to APIs & Services > Credentials > Create Credentials > OAuth client ID > Web application.
+     4. Under "Authorized JavaScript origins" add your GitHub Pages URL
+        (e.g. https://yourusername.github.io) and http://localhost for local testing.
+     5. Copy the generated Client ID and paste it below, replacing the placeholder.
+     Drive sync is optional — the app works fully offline without it. */
+  var GOOGLE_CLIENT_ID = "YOUR_CLIENT_ID.apps.googleusercontent.com";
+  var DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+  var DRIVE_FILENAME = "catataka-diary-data.json";
+  var DRIVE_FLAG_KEY = "catataka_drive_connected";
+
+  var MOODS = [
+    { emoji:"🤩", label:"Excited" },
+    { emoji:"😊", label:"Happy" },
+    { emoji:"😌", label:"Calm" },
+    { emoji:"😐", label:"Neutral" },
+    { emoji:"😴", label:"Tired" },
+    { emoji:"😰", label:"Anxious" },
+    { emoji:"😔", label:"Sad" },
+    { emoji:"😠", label:"Angry" }
+  ];
+
+  // ---------- storage ----------
+  function loadEntries(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    }catch(e){
+      console.error("Catataka: could not read saved entries", e);
+      return {};
+    }
+  }
+  function saveEntries(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    }catch(e){
+      console.error("Catataka: could not save entries", e);
+      alert("Your entry could not be saved. Your browser storage may be full or blocked.");
+    }
+    pushToDrive();
+  }
+
+  var entries = loadEntries(); // { "YYYY-MM-DD": { mood, text, updated } }
+
+  // ---------- state ----------
+  var currentView = "calendar";
+  var currentMonth = new Date(); currentMonth.setDate(1);
+  var selectedDate = null;
+  var selectedMood = null;
+  var searchQuery = "";
+  var tokenClient = null;
+  var accessToken = null;
+  var driveFileId = null;
+  var driveConnected = false;
+
+  // ---------- helpers ----------
+  function pad(n){ return n < 10 ? "0" + n : "" + n; }
+  function toDateStr(d){ return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
+  function todayStr(){ return toDateStr(new Date()); }
+  function formatLong(dateStr){
+    var parts = dateStr.split("-").map(Number);
+    var d = new Date(parts[0], parts[1]-1, parts[2]);
+    return d.toLocaleDateString(undefined, { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+  }
+  function moodByEmoji(emoji){
+    for(var i=0;i<MOODS.length;i++){ if(MOODS[i].emoji === emoji) return MOODS[i]; }
+    return null;
+  }
+
+  // ---------- elements ----------
+  var els = {
+    toggleBtns: document.querySelectorAll(".toggle-btn"),
+    views: document.querySelectorAll(".view"),
+    moodTrail: document.getElementById("moodTrail"),
+    monthLabel: document.getElementById("monthLabel"),
+    calendarGrid: document.getElementById("calendarGrid"),
+    prevMonth: document.getElementById("prevMonth"),
+    nextMonth: document.getElementById("nextMonth"),
+    blogList: document.getElementById("blogList"),
+    blogEmpty: document.getElementById("blogEmpty"),
+    searchInput: document.getElementById("searchInput"),
+    modalBackdrop: document.getElementById("modalBackdrop"),
+    modalDate: document.getElementById("modalDate"),
+    moodPicker: document.getElementById("moodPicker"),
+    entryText: document.getElementById("entryText"),
+    saveEntry: document.getElementById("saveEntry"),
+    deleteEntry: document.getElementById("deleteEntry"),
+    closeModal: document.getElementById("closeModal"),
+    exportBtn: document.getElementById("exportBtn"),
+    importInput: document.getElementById("importInput"),
+    driveSyncBtn: document.getElementById("driveSyncBtn"),
+    storageNote: document.getElementById("storageNote")
+  };
+
+  // ---------- view toggle ----------
+  els.toggleBtns.forEach(function(btn){
+    btn.addEventListener("click", function(){
+      currentView = btn.getAttribute("data-view");
+      els.toggleBtns.forEach(function(b){ b.classList.toggle("active", b === btn); });
+      els.views.forEach(function(v){ v.classList.toggle("active", v.id === currentView + "View"); });
+      if(currentView === "blog") renderBlog();
+    });
+  });
+
+  // ---------- mood trail ----------
+  function renderMoodTrail(){
+    var dated = Object.keys(entries)
+      .filter(function(k){ return entries[k].mood; })
+      .sort()
+      .slice(-14);
+
+    els.moodTrail.innerHTML = "";
+    if(dated.length === 0){
+      var p = document.createElement("p");
+      p.className = "trail-empty";
+      p.textContent = "Your mood trail will appear here as you write.";
+      els.moodTrail.appendChild(p);
+      return;
+    }
+    dated.forEach(function(dateStr){
+      var entry = entries[dateStr];
+      var mood = moodByEmoji(entry.mood);
+      var bead = document.createElement("button");
+      bead.className = "bead";
+      bead.type = "button";
+      bead.textContent = entry.mood;
+      bead.title = formatLong(dateStr) + (mood ? " — " + mood.label : "");
+      bead.addEventListener("click", function(){ openModal(dateStr); });
+      els.moodTrail.appendChild(bead);
+    });
+  }
+
+  // ---------- calendar ----------
+  function renderCalendar(){
+    var year = currentMonth.getFullYear();
+    var month = currentMonth.getMonth();
+    els.monthLabel.textContent = currentMonth.toLocaleDateString(undefined, { month:"long", year:"numeric" });
+
+    var firstWeekday = new Date(year, month, 1).getDay();
+    var daysInMonth = new Date(year, month+1, 0).getDate();
+    var today = todayStr();
+
+    els.calendarGrid.innerHTML = "";
+
+    for(var i=0;i<firstWeekday;i++){
+      var blank = document.createElement("div");
+      blank.className = "day-cell blank";
+      els.calendarGrid.appendChild(blank);
+    }
+
+    for(var day=1; day<=daysInMonth; day++){
+      var dateStr = year + "-" + pad(month+1) + "-" + pad(day);
+      var entry = entries[dateStr];
+      var cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "day-cell" + (entry ? " has-entry" : "") + (dateStr === today ? " is-today" : "");
+      cell.setAttribute("data-date", dateStr);
+      cell.setAttribute("aria-label", formatLong(dateStr) + (entry ? ", has a page" : ", no page yet"));
+
+      var num = document.createElement("span");
+      num.className = "day-num";
+      num.textContent = day;
+      cell.appendChild(num);
+
+      if(entry && entry.mood){
+        var moodSpan = document.createElement("span");
+        moodSpan.className = "day-mood";
+        moodSpan.textContent = entry.mood;
+        cell.appendChild(moodSpan);
+      }
+
+      cell.addEventListener("click", function(){ openModal(this.getAttribute("data-date")); });
+      els.calendarGrid.appendChild(cell);
+    }
+  }
+
+  els.prevMonth.addEventListener("click", function(){
+    currentMonth.setMonth(currentMonth.getMonth()-1);
+    renderCalendar();
+  });
+  els.nextMonth.addEventListener("click", function(){
+    currentMonth.setMonth(currentMonth.getMonth()+1);
+    renderCalendar();
+  });
+
+  // ---------- blog view ----------
+  function renderBlog(){
+    var allDates = Object.keys(entries).sort().reverse();
+    var query = searchQuery.trim().toLowerCase();
+    var dates = query
+      ? allDates.filter(function(d){ return (entries[d].text || "").toLowerCase().indexOf(query) !== -1; })
+      : allDates;
+
+    els.blogList.innerHTML = "";
+    els.blogEmpty.hidden = dates.length > 0;
+    if(dates.length === 0){
+      els.blogEmpty.textContent = allDates.length === 0
+        ? "No pages yet. Tap a day on the calendar to write your first one."
+        : "No pages match \"" + searchQuery.trim() + "\".";
+    }
+
+    dates.forEach(function(dateStr){
+      var entry = entries[dateStr];
+      var card = document.createElement("article");
+      card.className = "page-card";
+
+      var head = document.createElement("div");
+      head.className = "page-card-head";
+
+      var dateEl = document.createElement("span");
+      dateEl.className = "page-date";
+      dateEl.textContent = formatLong(dateStr);
+      head.appendChild(dateEl);
+
+      if(entry.mood){
+        var moodEl = document.createElement("span");
+        moodEl.className = "page-mood";
+        moodEl.textContent = entry.mood;
+        head.appendChild(moodEl);
+      }
+      card.appendChild(head);
+
+      var textEl = document.createElement("p");
+      textEl.className = "page-text";
+      textEl.textContent = entry.text || "";
+      card.appendChild(textEl);
+
+      card.addEventListener("click", function(){ openModal(dateStr); });
+
+      els.blogList.appendChild(card);
+    });
+  }
+
+  els.searchInput.addEventListener("input", function(){
+    searchQuery = els.searchInput.value;
+    renderBlog();
+  });
+
+  // ---------- modal ----------
+  function buildMoodPicker(){
+    els.moodPicker.innerHTML = "";
+    MOODS.forEach(function(mood){
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mood-option";
+      btn.setAttribute("data-emoji", mood.emoji);
+
+      var emojiSpan = document.createElement("span");
+      emojiSpan.textContent = mood.emoji;
+      btn.appendChild(emojiSpan);
+
+      var labelSpan = document.createElement("span");
+      labelSpan.className = "label";
+      labelSpan.textContent = mood.label;
+      btn.appendChild(labelSpan);
+
+      btn.addEventListener("click", function(){
+        var emoji = this.getAttribute("data-emoji");
+        selectedMood = (selectedMood === emoji) ? null : emoji;
+        Array.prototype.forEach.call(els.moodPicker.children, function(child){
+          child.classList.toggle("selected", child.getAttribute("data-emoji") === selectedMood);
+        });
+      });
+
+      els.moodPicker.appendChild(btn);
+    });
+  }
+  buildMoodPicker();
+
+  function openModal(dateStr){
+    selectedDate = dateStr;
+    var entry = entries[dateStr];
+    selectedMood = entry ? (entry.mood || null) : null;
+
+    els.modalDate.textContent = formatLong(dateStr);
+    els.entryText.value = entry ? (entry.text || "") : "";
+    els.deleteEntry.hidden = !entry;
+
+    Array.prototype.forEach.call(els.moodPicker.children, function(child){
+      child.classList.toggle("selected", child.getAttribute("data-emoji") === selectedMood);
+    });
+
+    els.modalBackdrop.hidden = false;
+    els.entryText.focus();
+  }
+
+  function closeModal(){
+    els.modalBackdrop.hidden = true;
+    selectedDate = null;
+    selectedMood = null;
+  }
+
+  els.closeModal.addEventListener("click", closeModal);
+  els.modalBackdrop.addEventListener("click", function(e){
+    if(e.target === els.modalBackdrop) closeModal();
+  });
+  document.addEventListener("keydown", function(e){
+    if(e.key === "Escape" && !els.modalBackdrop.hidden) closeModal();
+  });
+
+  els.saveEntry.addEventListener("click", function(){
+    if(!selectedDate) return;
+    var text = els.entryText.value.trim();
+    if(!text && !selectedMood){
+      alert("Add a mood or a few words before saving.");
+      return;
+    }
+    entries[selectedDate] = {
+      mood: selectedMood || "",
+      text: text,
+      updated: Date.now()
+    };
+    saveEntries();
+    closeModal();
+    renderCalendar();
+    renderMoodTrail();
+    if(currentView === "blog") renderBlog();
+  });
+
+  els.deleteEntry.addEventListener("click", function(){
+    if(!selectedDate) return;
+    if(!confirm("Delete this page? This cannot be undone.")) return;
+    delete entries[selectedDate];
+    saveEntries();
+    closeModal();
+    renderCalendar();
+    renderMoodTrail();
+    if(currentView === "blog") renderBlog();
+  });
+
+  // ---------- backup / restore ----------
+  els.exportBtn.addEventListener("click", function(){
+    var blob = new Blob([JSON.stringify(entries, null, 2)], { type:"application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "catataka-backup-" + todayStr() + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  els.importInput.addEventListener("change", function(e){
+    var file = e.target.files && e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try{
+        var imported = JSON.parse(reader.result);
+        if(typeof imported !== "object" || imported === null) throw new Error("bad format");
+        var count = 0;
+        Object.keys(imported).forEach(function(key){
+          if(/^\d{4}-\d{2}-\d{2}$/.test(key) && imported[key] && typeof imported[key] === "object"){
+            entries[key] = imported[key];
+            count++;
+          }
+        });
+        saveEntries();
+        renderCalendar();
+        renderMoodTrail();
+        renderBlog();
+        alert("Imported " + count + " page" + (count === 1 ? "" : "s") + ".");
+      }catch(err){
+        alert("That file doesn't look like a valid Catataka backup.");
+      }
+      els.importInput.value = "";
+    };
+    reader.readAsText(file);
+  });
+
+  // ---------- Google Drive sync ----------
+  function ensureGoogleReady(cb, attempts){
+    attempts = attempts || 0;
+    if(window.google && google.accounts && google.accounts.oauth2){
+      cb();
+    }else if(attempts < 25){
+      setTimeout(function(){ ensureGoogleReady(cb, attempts + 1); }, 200);
+    }else{
+      alert("Google Sign-In couldn't load. Check your connection or ad blocker, then try again.");
+      updateDriveUI("idle");
+    }
+  }
+
+  function updateDriveUI(state){
+    var btn = els.driveSyncBtn;
+    var note = els.storageNote;
+    btn.classList.remove("connected");
+    btn.disabled = false;
+    switch(state){
+      case "connected":
+        btn.textContent = "Drive connected";
+        btn.classList.add("connected");
+        note.textContent = "Synced to your Google Drive, and cached in this browser.";
+        break;
+      case "syncing":
+        btn.textContent = "Syncing…";
+        btn.disabled = true;
+        note.textContent = "Syncing with Google Drive…";
+        break;
+      case "expired":
+        btn.textContent = "Reconnect Google Drive";
+        note.textContent = "Drive sync needs you to reconnect.";
+        break;
+      case "error":
+        btn.textContent = "Reconnect Google Drive";
+        note.textContent = "Drive sync hit a snag. Your pages are still safe in this browser.";
+        break;
+      default:
+        btn.textContent = "Connect Google Drive";
+        note.textContent = "Saved privately in this browser only.";
+    }
+  }
+
+  function driveApiFetch(url, options){
+    options = options || {};
+    var headers = options.headers || {};
+    headers["Authorization"] = "Bearer " + accessToken;
+    options.headers = headers;
+    return fetch(url, options);
+  }
+
+  function findDriveFile(){
+    var q = encodeURIComponent("name='" + DRIVE_FILENAME + "' and trashed=false");
+    return driveApiFetch("https://www.googleapis.com/drive/v3/files?q=" + q + "&spaces=drive&fields=files(id,name)")
+      .then(function(res){
+        if(!res.ok) throw new Error("drive-list-failed:" + res.status);
+        return res.json();
+      })
+      .then(function(data){
+        return (data.files && data.files.length > 0) ? data.files[0].id : null;
+      });
+  }
+
+  function createDriveFile(contentStr){
+    var metadata = { name: DRIVE_FILENAME, mimeType: "application/json" };
+    var boundary = "catataka_boundary_" + Date.now();
+    var body =
+      "--" + boundary + "\r\n" +
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+      JSON.stringify(metadata) + "\r\n" +
+      "--" + boundary + "\r\n" +
+      "Content-Type: application/json\r\n\r\n" +
+      contentStr + "\r\n" +
+      "--" + boundary + "--";
+    return driveApiFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+      method: "POST",
+      headers: { "Content-Type": "multipart/related; boundary=" + boundary },
+      body: body
+    })
+      .then(function(res){
+        if(!res.ok) throw new Error("drive-create-failed:" + res.status);
+        return res.json();
+      })
+      .then(function(data){ return data.id; });
+  }
+
+  function readDriveFile(fileId){
+    return driveApiFetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media")
+      .then(function(res){
+        if(!res.ok) throw new Error("drive-read-failed:" + res.status);
+        return res.text();
+      })
+      .then(function(text){
+        try{ return JSON.parse(text); }catch(e){ return {}; }
+      });
+  }
+
+  function writeDriveFile(fileId, contentStr){
+    return driveApiFetch("https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=media", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: contentStr
+    }).then(function(res){
+      if(!res.ok) throw new Error("drive-write-failed:" + res.status);
+      return res.json();
+    });
+  }
+
+  // Two-way merge: for any date present on both sides, keep whichever copy has the newer "updated" timestamp.
+  function mergeEntries(localData, remoteData){
+    var merged = {};
+    var keys = {};
+    Object.keys(localData || {}).forEach(function(k){ keys[k] = true; });
+    Object.keys(remoteData || {}).forEach(function(k){ keys[k] = true; });
+    Object.keys(keys).forEach(function(k){
+      var l = localData ? localData[k] : null;
+      var r = remoteData ? remoteData[k] : null;
+      if(l && r){
+        merged[k] = (r.updated || 0) > (l.updated || 0) ? r : l;
+      }else{
+        merged[k] = l || r;
+      }
+    });
+    return merged;
+  }
+
+  function runInitialSync(){
+    findDriveFile()
+      .then(function(fileId){
+        if(fileId){
+          driveFileId = fileId;
+          return readDriveFile(fileId).then(function(remoteData){
+            entries = mergeEntries(entries, remoteData);
+            try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }catch(e){}
+            return writeDriveFile(fileId, JSON.stringify(entries));
+          });
+        }
+        return createDriveFile(JSON.stringify(entries)).then(function(id){ driveFileId = id; });
+      })
+      .then(function(){
+        updateDriveUI("connected");
+        renderCalendar();
+        renderMoodTrail();
+        renderBlog();
+      })
+      .catch(function(err){
+        console.error("Catataka: Drive sync failed", err);
+        updateDriveUI("error");
+      });
+  }
+
+  function pushToDrive(){
+    if(!driveConnected || !accessToken || !driveFileId) return;
+    writeDriveFile(driveFileId, JSON.stringify(entries))
+      .then(function(){ updateDriveUI("connected"); })
+      .catch(function(err){
+        console.error("Catataka: could not sync to Drive", err);
+        if(("" + err.message).indexOf("401") !== -1){
+          accessToken = null;
+          updateDriveUI("expired");
+        }else{
+          updateDriveUI("error");
+        }
+      });
+  }
+
+  function handleTokenResponse(resp){
+    if(!resp || resp.error){
+      updateDriveUI(driveConnected ? "expired" : "idle");
+      return;
+    }
+    accessToken = resp.access_token;
+    driveConnected = true;
+    try{ localStorage.setItem(DRIVE_FLAG_KEY, "1"); }catch(e){}
+    updateDriveUI("syncing");
+    runInitialSync();
+  }
+
+  function connectDrive(silent){
+    ensureGoogleReady(function(){
+      if(!tokenClient){
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: DRIVE_SCOPE,
+          callback: handleTokenResponse
+        });
+      }
+      tokenClient.requestAccessToken({ prompt: silent ? "" : "consent" });
+    });
+  }
+
+  els.driveSyncBtn.addEventListener("click", function(){
+    if(GOOGLE_CLIENT_ID.indexOf("YOUR_CLIENT_ID") !== -1){
+      alert("Add your Google OAuth Client ID in the script's Drive-sync setup section before connecting.");
+      return;
+    }
+    updateDriveUI("syncing");
+    connectDrive(false);
+  });
+
+  // ---------- init ----------
+  renderCalendar();
+  renderMoodTrail();
+  renderBlog();
+
+  if(GOOGLE_CLIENT_ID.indexOf("YOUR_CLIENT_ID") === -1){
+    try{
+      if(localStorage.getItem(DRIVE_FLAG_KEY) === "1"){
+        updateDriveUI("syncing");
+        connectDrive(true);
+      }
+    }catch(e){}
+  }
+})();
+</script>
+</body>
+</html>
