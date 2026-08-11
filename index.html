@@ -559,6 +559,7 @@
   var accessToken = null;
   var driveFileId = null;
   var driveConnected = false;
+  var driveConnectTimeout = null;
 
   // ---------- helpers ----------
   function pad(n){ return n < 10 ? "0" + n : "" + n; }
@@ -1043,6 +1044,7 @@
   }
 
   function handleTokenResponse(resp){
+    clearTimeout(driveConnectTimeout);
     if(!resp || resp.error){
       updateDriveUI(driveConnected ? "expired" : "idle");
       return;
@@ -1073,6 +1075,11 @@
       return;
     }
     updateDriveUI("syncing");
+    clearTimeout(driveConnectTimeout);
+    driveConnectTimeout = setTimeout(function(){
+      updateDriveUI(driveConnected ? "expired" : "idle");
+      alert("Connecting to Google Drive timed out. If a sign-in popup was blocked, allow popups for this site and try again.");
+    }, 20000);
     connectDrive(false);
   });
 
@@ -1085,6 +1092,9 @@
     try{
       if(localStorage.getItem(DRIVE_FLAG_KEY) === "1"){
         updateDriveUI("syncing");
+        driveConnectTimeout = setTimeout(function(){
+          updateDriveUI("expired");
+        }, 20000);
         connectDrive(true);
       }
     }catch(e){}
